@@ -43,7 +43,7 @@ router.post("/register", registerValidators, async (req, res) => {
       lastName,
       email.toLowerCase().trim(),
       passwordHash,
-      role,
+      role || 'user', // Default role if not provided
     ];
 
     const { rows } = await pool.query(insertSql, params);
@@ -160,6 +160,14 @@ router.post("/login", loginValidators, async (req, res) => {
       }
     );
 
+    // ✅ Set HTTP-only cookie for page navigation
+    res.cookie('token', token, {
+      httpOnly: true,      // Can't be accessed by JavaScript (XSS protection)
+      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      sameSite: 'lax',     // CSRF protection
+      maxAge: 2 * 60 * 60 * 1000 // 2 hours (matching JWT expiry)
+    });
+
     await logEvent({
       actorUserId: user.id,
       action: "login",
@@ -170,7 +178,7 @@ router.post("/login", loginValidators, async (req, res) => {
 
     return res.status(200).json({
       ok: true,
-      token,
+      token, // Still return token for API clients that might want it
       data: {
         id: user.id,
         firstName: user.first_name,
@@ -184,6 +192,31 @@ router.post("/login", loginValidators, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "Database error",
+    });
+  }
+});
+
+/* =====================================================
+   LOGOUT
+===================================================== */
+router.post("/logout", async (req, res) => {
+  try {
+    // Clear the token cookie
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
+    });
+    
+    return res.status(200).json({
+      ok: true,
+      message: "Logged out successfully"
+    });
+  } catch (err) {
+    console.error("LOGOUT failed:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Logout failed"
     });
   }
 });

@@ -1,5 +1,6 @@
 // src/app.js
 import express from "express";
+import cookieParser from "cookie-parser"; // ✅ Add this import
 import resourcesRouter from "./routes/resources.routes.js";
 import reservationsRouter from "./routes/reservations.routes.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -14,16 +15,18 @@ const app = express();
 
 // --- Middleware ---
 app.use(express.json()); // Parse application/json
+app.use(cookieParser()); // ✅ Add cookie parser middleware
 
-// Validator debug
-/*app.use((req, _res, next) => {
-  console.log('--- Incoming request --------------------------------');
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  console.log('Headers:', req.headers);
-  console.log('Parsed body:', req.body);
-  console.log('------------------------------------------------------');
+// Content Security Policy Header
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "script-src 'self' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src https://fonts.gstatic.com;"
+  );
   next();
-});*/
+});
 
 // Serve everything in ./public as static assets
 const publicDir = path.join(__dirname, "..", "public");
@@ -72,8 +75,6 @@ app.use("/api", (req, res) => {
 // Frontend 404 (unknown pages)
 // ----------------------------
 app.use((req, res) => {
-  // If you have a dedicated 404.html, prefer that.
-  // Otherwise return a simple message.
   return res.status(404).send("404 - Page not found");
 });
 
@@ -83,7 +84,6 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
 
-  // If a response already started, delegate to Express default handler
   if (res.headersSent) return next(err);
 
   return res.status(500).json({
